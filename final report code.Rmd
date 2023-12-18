@@ -1,0 +1,260 @@
+---
+title: "Final project code"
+author: "Ruisi Geng"
+date: "2023-12-07"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Load data
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(pvclust)
+library(cluster)
+library(factoextra)
+
+# read data
+data1 <- read.csv("data_1.csv", header=TRUE)
+data1<- data1[,-1]
+
+# Data source and structure description
+cat("Data Structure Description:\n")
+str(data1)
+```
+
+### EDA
+
+#### The descriptive statistical analysis aims to understand sample characteristics
+
+```{r}
+# Load necessary libraries for visualization
+library(ggplot2)
+
+# EDA
+cat("Exploratory Data Analysis with Descriptive Statistics and Visualizations:\n")
+
+# Age Distribution
+cat("Age Distribution:\n")
+summary(data1$B1PAGE_M2.x, na.rm = TRUE)
+sd(data1$B1PAGE_M2.x, na.rm = TRUE)
+ggplot(data1, aes(x = B1PAGE_M2.x)) + 
+  geom_histogram(binwidth = 1, fill = "lightyellow", color = "black") +
+  labs(title = "Age Distribution", x = "Age", y = "Frequency")
+
+# Gender Distribution
+cat("Gender Distribution:\n")
+summary(data1$B1PGENDER, na.rm = TRUE)
+ggplot(data1, aes(x = factor(B1PGENDER))) + 
+  geom_bar(fill = "orange", color = "black") +
+  labs(title = "Gender Distribution", x = "Gender", y = "Count")
+
+# Income Distribution
+cat("Income Distribution:\n")
+summary(data1$B1STINC1, na.rm = TRUE)
+sd(data1$B1STINC1, na.rm = TRUE)
+ggplot(data1, aes(x = B1STINC1)) + 
+  geom_histogram(binwidth = 5000, fill = "lightblue", color = "black") +
+  labs(title = "Income Distribution", x = "Income", y = "Frequency")
+
+# Race Distribution
+cat("Race Distribution:\n")
+summary(data1$race, na.rm = TRUE)
+ggplot(data1, aes(x = factor(race))) + 
+  geom_bar(fill = "lightgreen", color = "black") +
+  labs(title = "Race Distribution", x = "Race", y = "Count")
+
+# Marital Status
+cat("Marital Status Distribution:\n")
+summary(data1$marital, na.rm = TRUE)
+ggplot(data1, aes(x = factor(marital))) + 
+  geom_bar(fill = "pink", color = "black") +
+  labs(title = "Marital Status Distribution", x = "Marital Status", y = "Count")
+```
+
+### Missing value Handling
+
+#### First, visually display the missing values, and then process them.
+
+```{r}
+# Create a data frame with the number of missing values for each variable
+na_counts <- data1 %>% summarise_all(~sum(is.na(.))) %>% gather(key = "Variable", value = "NA_Count")
+
+# Draw a bar chart of missing values
+ggplot(na_counts, aes(x = Variable, y = NA_Count)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Missing Values in Each Variable", x = "Variable", y = "Number of Missing Values")
+
+
+# Function to calculate the mode
+get_mode <- function(v) {
+  uniqv <- unique(na.omit(v))
+  uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+
+# Missing value handling
+
+# Use median to fill missing values for continuous variables
+data1$B1SPWBU2[is.na(data1$B1SPWBU2)] <- median(data1$B1SPWBU2, na.rm = TRUE)
+data1$B1STINC1[is.na(data1$B1STINC1)] <- median(data1$B1STINC1, na.rm = TRUE)
+data1$B2DNEGAV[is.na(data1$B2DNEGAV)] <- median(data1$B2DNEGAV, na.rm = TRUE)
+
+# Use mode to fill missing values for categorical variables
+data1$B2DN_STR[is.na(data1$B2DN_STR)] <- get_mode(data1$B2DN_STR)
+data1$race[is.na(data1$race)] <- get_mode(data1$race)
+data1$marital[is.na(data1$marital)] <- get_mode(data1$marital)
+
+# For rating variables (assuming a 1-10 scale), use median or mode
+data1$B1SQ2[is.na(data1$B1SQ2)] <- median(data1$B1SQ2, na.rm = TRUE)
+data1$B1SQ1[is.na(data1$B1SQ1)] <- median(data1$B1SQ1, na.rm = TRUE)
+data1$B1SQ3[is.na(data1$B1SQ3)] <- median(data1$B1SQ3, na.rm = TRUE)
+
+# Print the updated data to check
+sum(is.na(data1))
+```
+
+### More dimensions of data visualization
+
+```{r}
+# correlation matrix - Correlation between variables
+library(corrplot)
+M <- cor(data1, use = "complete.obs")
+corrplot(M, method = "circle")
+
+# Comparative analysis - Income distribution by sex
+ggplot(data1, aes(x = factor(B1PGENDER), y = B1STINC1)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(title = "Income Distribution by Gender", x = "Gender", y = "Income")
+
+# Correlation analysis - Scatter plot of age and income
+ggplot(data1, aes(x = B1PAGE_M2.x, y = B1STINC1)) +
+  geom_point(aes(color = factor(B1PGENDER))) +
+  labs(title = "Scatter Plot of Age vs Income", x = "Age", y = "Income")
+
+# multivariate analysis - gender difference of income
+ggplot(data1, aes(x = B1PAGE_M2.x, fill = factor(B1PGENDER))) +
+  geom_histogram(binwidth = 1) +
+  facet_wrap(~ B1PGENDER) +
+  labs(title = "Age Distribution by Gender", x = "Age", y = "Count")
+```
+
+```{r}
+# save data into original path
+write.csv(data1, "cleaned_data.csv", row.names = FALSE)
+```
+
+Cluster Analysis
+```{r}
+library(cluster)
+life_satisfaction <- na.exclude(data1[, c("B1SQ2", "B1SQ1", "B1SQ3")])
+d <- dist(life_satisfaction, method = "euclidean")
+fit_hc <- hclust(d, method="ward.D2")
+clusters <- cutree(fit_hc, k=3)  
+data1$cluster <- clusters
+
+# Perform K-means clustering
+
+# Determine the optimal number of clusters
+set.seed(123)
+wss <- (nrow(data1)-1)*sum(apply(data1,2,var))
+for (i in 2:15) wss[i] <- sum(kmeans(data1, centers=i)$withinss)
+
+# Plot elbow method
+plot(1:15, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
+
+# Perform K-means with an appropriate number of clusters
+set.seed(123)
+kmeans_result <- kmeans(data1, centers=3) 
+data1$cluster <- as.factor(kmeans_result$cluster)
+
+# Analyze the cluster results
+table(data1$cluster)
+
+```
+
+Multilevel Analysis
+```{r}
+library(lme4)
+library(ggplot2)
+
+model_mcrm <- lmer(B2DNEGAV ~ cluster + (1|M2ID), data=data1)
+summary(model_mcrm)
+
+# Extracting random effects for M2ID
+rand_eff <- ranef(model_mcrm)$M2ID
+rand_eff_df <- as.data.frame(rand_eff)
+rand_eff_df$M2ID <- rownames(rand_eff_df)
+
+# Plotting random effects
+ggplot(rand_eff_df, aes(x=M2ID, y=`(Intercept)`)) +  
+  geom_point() +
+  theme_minimal() +
+  labs(title="Random Effects (Intercepts) for Each M2ID",
+       x="M2ID",
+       y="Random Effect (Intercept)")
+
+```
+
+Regression Analysis 1
+```{r}
+model_ols <- lm(sdNA ~ cluster * B1SPWBU2, data=data1)
+summary(model_ols)
+# Create a new data frame for plotting
+plot_data <- data1
+plot_data$predicted_sdNA <- predict(model_ols, newdata = data1)
+
+# Plotting
+ggplot(plot_data, aes(x=B1SPWBU2, y=sdNA, color=factor(cluster))) +
+  geom_point() +  # Actual data points
+  geom_line(aes(y=predicted_sdNA)) +  # Regression lines
+  theme_minimal() +
+  labs(title="Relationship between age and sdNA across Clusters",
+       x="age",
+       y="sdNA",
+       color="Cluster")
+```
+
+Regression Analysis 2
+```{r}
+model_ols2 <- lm(sdNA ~ cluster * B1STINC1, data=data1) 
+summary(model_ols)
+# Create a new data frame for plotting
+plot_data <- data1
+plot_data$predicted_sdNA <- predict(model_ols, newdata = data1)
+
+# Plotting
+ggplot(plot_data, aes(x=B1STINC1, y=sdNA, color=factor(cluster))) +
+  geom_point() +  # Actual data points
+  geom_line(aes(y=predicted_sdNA)) +  # Regression lines
+  theme_minimal() +
+  labs(title="Relationship between income and sdNA across Clusters",
+       x="income",
+       y="sdNA",
+       color="Cluster")
+```
+
+Regression Analysis 3
+```{r}
+model_ols3 <- lm(sdNA ~ cluster * B1PGENDER, data=data1) 
+summary(model_ols)
+# Create a new data frame for plotting
+plot_data <- data1
+plot_data$predicted_sdNA <- predict(model_ols, newdata = data1)
+
+# Plotting
+ggplot(plot_data, aes(x=B1PGENDER, y=sdNA, color=factor(cluster))) +
+  geom_point() +  # Actual data points
+  geom_line(aes(y=predicted_sdNA)) +  # Regression lines
+  theme_minimal() +
+  labs(title="Relationship between gender and sdNA across Clusters",
+       x="gender",
+       y="sdNA",
+       color="Cluster")
+```
+
