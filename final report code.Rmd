@@ -149,7 +149,7 @@ ggplot(data1, aes(x = B1PAGE_M2.x, fill = factor(B1PGENDER))) +
 write.csv(data1, "cleaned_data.csv", row.names = FALSE)
 ```
 
-Cluster Analysis
+### Cluster Analysis
 ```{r}
 library(cluster)
 life_satisfaction <- na.exclude(data1[, c("B1SQ2", "B1SQ1", "B1SQ3")])
@@ -178,7 +178,7 @@ table(data1$cluster)
 
 ```
 
-Multilevel Analysis
+### Multilevel Analysis
 ```{r}
 library(lme4)
 library(ggplot2)
@@ -198,10 +198,9 @@ ggplot(rand_eff_df, aes(x=M2ID, y=`(Intercept)`)) +
   labs(title="Random Effects (Intercepts) for Each M2ID",
        x="M2ID",
        y="Random Effect (Intercept)")
-
 ```
 
-Regression Analysis 1
+### Regression Analysis 1
 ```{r}
 model_ols <- lm(sdNA ~ cluster * B1SPWBU2, data=data1)
 summary(model_ols)
@@ -220,7 +219,7 @@ ggplot(plot_data, aes(x=B1SPWBU2, y=sdNA, color=factor(cluster))) +
        color="Cluster")
 ```
 
-Regression Analysis 2
+### Regression Analysis 2
 ```{r}
 model_ols2 <- lm(sdNA ~ cluster * B1STINC1, data=data1) 
 summary(model_ols)
@@ -239,7 +238,7 @@ ggplot(plot_data, aes(x=B1STINC1, y=sdNA, color=factor(cluster))) +
        color="Cluster")
 ```
 
-Regression Analysis 3
+### Regression Analysis 3
 ```{r}
 model_ols3 <- lm(sdNA ~ cluster * B1PGENDER, data=data1) 
 summary(model_ols)
